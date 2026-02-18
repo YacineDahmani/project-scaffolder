@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+
+# Determine script directory to source libraries correctly
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib/utils.sh"
+source "$SCRIPT_DIR/lib/git_utils.sh"
+
+show_help() {
+    echo "Usage: $0 <command> [args]"
+    echo "Commands:"
+    echo "  push [msg]  - Auto-commit and push changes"
+    echo "  pull        - Pull changes with rebase"
+    echo "  status      - Show git status"
+    echo "  amend       - Amend the last commit without editing message"
+    echo "  undo        - Undo the last commit (keep changes staged)"
+    echo "  log         - Show compact git log"
+    exit 1
+}
+
+# Default to 'push' if no arguments are provided
+if [[ $# -eq 0 ]]; then
+    CMD="push"
+else
+    CMD="$1"
+    shift
+fi
+
+case "$CMD" in
+    push)
+        git_auto_push "$@"
+        ;;
+    pull)
+        log_info "Pulling changes (rebase)..."
+        git pull --rebase --autostash
+        log_success "Pulled changes."
+        ;;
+    status)
+        git status
+        ;;
+    amend)
+        git commit --amend --no-edit
+        log_success "Amended last commit."
+        ;;
+    undo)
+        git reset --soft HEAD~1
+        log_success "Undid last commit (changes are staged)."
+        ;;
+    log)
+        git log --oneline --graph --all -n 20
+        ;;
+    help|--help|-h)
+        show_help
+        ;;
+    *)
+        log_warning "Unknown command: $CMD"
+        show_help
+        ;;
+esac

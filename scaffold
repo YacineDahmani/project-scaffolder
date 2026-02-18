@@ -1,0 +1,96 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Determine script directory to source libraries correctly
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Source utilities
+source "$SCRIPT_DIR/lib/utils.sh"
+source "$SCRIPT_DIR/lib/git_utils.sh"
+
+# Source templates
+source "$SCRIPT_DIR/lib/templates/nodejs.sh"
+source "$SCRIPT_DIR/lib/templates/python.sh"
+source "$SCRIPT_DIR/lib/templates/flask.sh"
+source "$SCRIPT_DIR/lib/templates/react.sh"
+
+# Help message
+show_help() {
+    echo "Usage: $0 <project_name> -t <type>"
+    echo "Types:"
+    echo "  nodejs-fullstack  - Node.js backend + React frontend"
+    echo "  python            - Basic Python project"
+    echo "  flask             - Flask backend"
+    echo "  react             - React frontend"
+    exit 1
+}
+
+# Parse arguments
+if [[ $# -lt 1 ]]; then
+    show_help
+fi
+
+PROJECT_NAME="$1"
+shift
+
+TYPE=""
+if [[ "$1" == "-t" && -n "${2:-}" ]]; then
+    TYPE="$2"
+else
+    # Try to detect if user passed -t=type
+    for arg in "$@"; do
+        if [[ "$arg" == -t=* ]]; then
+            TYPE="${arg#-t=}"
+        fi
+    done
+fi
+
+if [[ -z "$TYPE" ]]; then
+    log_error "Project type is required."
+    show_help
+fi
+
+# Validation
+if [[ -d "$PROJECT_NAME" ]]; then
+    log_error "Directory '$PROJECT_NAME' already exists."
+    exit 1
+fi
+
+check_dependency git
+
+case "$TYPE" in
+    nodejs-fullstack)
+        check_dependency node
+        check_dependency npm
+        scaffold_nodejs_fullstack "$PROJECT_NAME"
+        ;;
+    python)
+        check_dependency python3
+        scaffold_python "$PROJECT_NAME"
+        ;;
+    flask)
+        check_dependency python3
+        scaffold_flask "$PROJECT_NAME"
+        ;;
+    react)
+        check_dependency node
+        check_dependency npm
+        scaffold_react "$PROJECT_NAME"
+        ;;
+    *)
+        log_error "Unknown type: $TYPE"
+        show_help
+        ;;
+esac
+
+# Common setup
+cd "$PROJECT_NAME"
+init_git_repo "."
+
+create_gitignore "." "node_modules/" "__pycache__/" "venv/" ".env" "build/" "dist/" ".DS_Store"
+
+# Initial commit
+git_commit_all "Initial commit"
+
+log_info "Project scaffolding complete!"
+log_info "To create a GitHub repo, run: gh repo create \"$PROJECT_NAME\" --private --source=. --push"
